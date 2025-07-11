@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  qdrant:
+    image: qdrant/qdrant
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - "C:/Users/Francisco/.ollama:/root/.ollama"
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n
+    container_name: n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin
+      - N8N_HOST=n8n.local
+      - N8N_PORT=5678
+      - WEBHOOK_TUNNEL_URL=http://localhost:5678
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+      - "C:/Users/Francisco/Desktop/DEV_STUFF/00_OPTIBOT/automatizacion-wp/n8n/n8n-qdrant:/data"
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
+  n8n_data:

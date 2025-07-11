@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - C:/Users/Francisco/.ollama:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - ia-network
+
+  n8n:
+    image: n8nio/n8n
+    container_name: n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=America/Argentina/Buenos_Aires
+    depends_on:
+      - ollama
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+      - "C:/Users/Francisco/Desktop/DEV_STUFF/00_OPTIBOT/automatizacion-wp/n8n:/data"
+    restart: unless-stopped
+    networks:
+      - ia-network
+
+  qdrant:
+    image: qdrant/qdrant
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+    networks:
+      - ia-network
+
+volumes:
+  qdrant_data:
+
+networks:
+  ia-network:
+    driver: bridge

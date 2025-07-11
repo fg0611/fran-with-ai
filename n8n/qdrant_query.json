@@ -1,0 +1,377 @@
+{
+  "name": "qdrant_embed_test",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -360,
+        -60
+      ],
+      "id": "eb901314-5f41-435f-83fc-edaa14045df1",
+      "name": "When chat message received",
+      "webhookId": "ed084582-d8f2-4936-82a2-b1e38c57d02f"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        -140
+      ],
+      "id": "c6d1e7ba-6bdd-4f70-af8c-49ad2c95c818",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "phi3:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        140
+      ],
+      "id": "641a4c1e-6548-438b-9538-a14a7fd0fdf1",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "MUuykEzl89tdgCUE",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 4
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -40,
+        120
+      ],
+      "id": "b2dd054e-7c69-428e-846b-07485a9ec957",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "description": "usa esta base de datos para buscar"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        20
+      ],
+      "id": "db7c516c-4222-4985-8658-6173b98514dd",
+      "name": "Answer questions with a vector store"
+    },
+    {
+      "parameters": {
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "=archivos",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        120,
+        160
+      ],
+      "id": "d980ee1f-18af-4ed5-b80f-3f57545fcd90",
+      "name": "Qdrant Vector Store",
+      "credentials": {
+        "qdrantApi": {
+          "id": "DWiVlIhTzsnHPiLB",
+          "name": "QdrantApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "nomic-embed-text:latest"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [
+        260,
+        320
+      ],
+      "id": "f2719662-1b44-424e-95bf-3490d34da7ea",
+      "name": "Embeddings Ollama",
+      "credentials": {
+        "ollamaApi": {
+          "id": "MUuykEzl89tdgCUE",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "phi3:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmOllama",
+      "typeVersion": 1,
+      "position": [
+        480,
+        180
+      ],
+      "id": "f3abc7c7-e27c-4563-abda-97ace23f37af",
+      "name": "Ollama Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "MUuykEzl89tdgCUE",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "ls /data/archivos/*.txt"
+      },
+      "id": "daeecd60-af43-4a46-ad0f-53b996b24c0b",
+      "name": "Listar archivos",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "command": "cat {{$json[\"file\"]}}"
+      },
+      "id": "29d187f2-63d7-45af-b611-56c2e023ccd3",
+      "name": "Leer archivo",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://ollama:11434/api/embeddings",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\"model\": \"nomic-embed-text\", \"prompt\": \"{{$json[\"stdout\"]}}\"}",
+        "headerParametersJson": "{ }",
+        "queryParametersJson": "{ }"
+      },
+      "id": "0fe178e4-6bc4-4a1d-a296-e0d9ee8ad472",
+      "name": "Generar Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "PUT",
+        "url": "http://qdrant:6333/collections/archivos/points",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"points\": [\n    {\n      \"id\": \"{{$json[\"file\"]}}\",\n      \"vector\": {{$json[\"embedding\"]}},\n      \"payload\": {\n        \"filename\": \"{{$json[\"file\"]}}\",\n        \"text\": \"{{$json[\"prompt\"]}}\"\n      }\n    }\n  ]\n}\n",
+        "headerParametersJson": "{}",
+        "queryParametersJson": "{}"
+      },
+      "id": "65e192c4-e6f6-42ee-afa6-9d370b65b7a7",
+      "name": "Subir a Qdrant",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        400,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const lines = $json[\"stdout\"].split(\"\\n\");\nreturn lines.map(file => ({ json: { file } }));"
+      },
+      "id": "8dd2a637-0065-42ec-a927-b17cb8689408",
+      "name": "Separar archivos",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -440,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [\n  {\n    json: {\n      file: $json.file,\n      prompt: $json.stdout,\n      embedding: $json.embedding\n    }\n  }\n];"
+      },
+      "id": "140ed455-fe11-40d2-bd19-45807100ab12",
+      "name": "Preparar JSON para Qdrant",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        160,
+        520
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer questions with a vector store": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Answer questions with a vector store",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Ollama": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer questions with a vector store",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listar archivos": {
+      "main": [
+        [
+          {
+            "node": "Separar archivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar archivos": {
+      "main": [
+        [
+          {
+            "node": "Leer archivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer archivo": {
+      "main": [
+        [
+          {
+            "node": "Generar Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar Embedding": {
+      "main": [
+        [
+          {
+            "node": "Preparar JSON para Qdrant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar JSON para Qdrant": {
+      "main": [
+        [
+          {
+            "node": "Subir a Qdrant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "41255077-eebe-445b-b8ba-6896752eb1ae",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c66ca7b0f36568937c71a9c782cbefb839e11ef252f554cb12ad2cb5693e42c0"
+  },
+  "id": "Qxp0iSObP9vHArO5",
+  "tags": []
+}

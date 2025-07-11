@@ -1,0 +1,24 @@
+[Carpeta con archivos]
+      │
+      └──▶ [Script o FS Watch] ─────┐
+                                     ▼
+                                [Webhook n8n]
+                                     ▼
+                       [Workflow: embeddings + Qdrant insert]
+
+[Chat usuario] ─▶ [phi3:latest (Ollama)] 
+                      │
+                      ▼
+             [Context fetch de Qdrant]
+                      ▼
+               [Respuesta generada]
+                      ▼
+                [Guardar en Qdrant]
+
+- Docker Compose con todo esto corriendo local
+
+- Flujo de n8n para monitoreo de archivos y actualización en Qdrant.
+
+- Script para consumir ollama embed y subir a Qdrant.
+
+- Flujo de chat que recupera contexto por chat_id y responde con phi3.

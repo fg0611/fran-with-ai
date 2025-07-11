@@ -1,0 +1,91 @@
+{
+  "name": "Embeddings a Qdrant",
+  "nodes": [
+    {
+      "id": "1",
+      "parameters": {
+        "functionCode": "return [\n  { filePath: \"/data/archivos/Plan_A1_PrevencionSalud.txt\" },\n  { filePath: \"/data/archivos/Plan_A2_PrevencionSalud.txt\" },\n  { filePath: \"/data/archivos/Plan_A4_PrevencionSalud.txt\" },\n  { filePath: \"/data/archivos/empresa.txt\" }\n];"
+      },
+      "name": "Generar Lista de Archivos",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [200, 200]
+    },
+    {
+      "id": "2",
+      "parameters": {
+        "batchSize": 1
+      },
+      "name": "Iterar Archivos",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [400, 200]
+    },
+    {
+      "id": "3",
+      "parameters": {
+        "command": "cat {{$json[\"filePath\"]}}"
+      },
+      "name": "Leer Archivo",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [600, 200]
+    },
+    {
+      "id": "4",
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://ollama:11434/api/embeddings",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "{\"model\": \"llama3\", \"prompt\": \"{{$node[\\\"Leer Archivo\\\"].json[\\\"stdout\\\"]}}\"}"
+      },
+      "name": "Generar Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [800, 200]
+    },
+    {
+      "id": "5",
+      "parameters": {
+        "functionCode": "const uuid = require('uuid');\n\nconst vector = $json.data[0].embedding;\n\nreturn [{\n  json: {\n    points: [\n      {\n        id: uuid.v4(),\n        vector,\n        payload: {\n          filePath: $item(0).$node[\"Iterar Archivos\"].json.filePath,\n          content_preview: $node[\"Leer Archivo\"].json.stdout.slice(0, 250),\n          timestamp: new Date().toISOString()\n        }\n      }\n    ]\n  }\n}];"
+      },
+      "name": "Formar JSON Qdrant",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1000, 200]
+    },
+    {
+      "id": "6",
+      "parameters": {
+        "requestMethod": "PUT",
+        "url": "http://qdrant:6333/collections/my_documents_collection/points",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ $json }}"
+      },
+      "name": "Enviar a Qdrant",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1200, 200]
+    }
+  ],
+  "connections": {
+    "Generar Lista de Archivos": {
+      "main": [[{ "node": "Iterar Archivos", "type": "main", "index": 0 }]]
+    },
+    "Iterar Archivos": {
+      "main": [[{ "node": "Leer Archivo", "type": "main", "index": 0 }]]
+    },
+    "Leer Archivo": {
+      "main": [[{ "node": "Generar Embedding", "type": "main", "index": 0 }]]
+    },
+    "Generar Embedding": {
+      "main": [[{ "node": "Formar JSON Qdrant", "type": "main", "index": 0 }]]
+    },
+    "Formar JSON Qdrant": {
+      "main": [[{ "node": "Enviar a Qdrant", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false
+}

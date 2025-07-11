@@ -1,0 +1,14 @@
+### Crear colección "archivos" en Qdrant
+# PUT http://localhost:6333/collections/archivos
+# Content-Type: application/json
+
+# {
+#   "vectors": {
+#     "size": 768,
+#     "distance": "Cosine"
+#   }
+# }
+
+
+
+GET http://localhost:6333/collections
