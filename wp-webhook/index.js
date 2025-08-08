@@ -44,7 +44,6 @@ client.on('message', async (message) => {
 
     const {output} = response.data;
 
-
     if (output) {
       console.log(output)
       await client.sendMessage(from, output);

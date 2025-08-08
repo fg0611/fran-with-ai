@@ -1,6 +1,7 @@
 # Node.js dependencies
 node_modules/
 drivers/
+session/
 
 # Logs
 logs
@@ -187,6 +188,9 @@ target/
 # IPython
 profile_default/
 ipython_config.py
+
+# pyenv requirements
+requirements.txt
 
 # pyenv
 # .python-version

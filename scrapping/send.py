@@ -9,12 +9,73 @@ from selenium.webdriver.common.action_chains import ActionChains
 import time
 import random
 import pandas as pd
+from dotenv import load_dotenv
+import os
+from supabase import create_client
+
+# Configuración
+load_dotenv(dotenv_path=r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\fran-with-ai\scrapping\.env")
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
+admin_phone = os.environ.get("ADMIN_PHONE")
+
+supabase = create_client(url, key)
+
+EDGE_DRIVER_PATH = r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\fran-with-ai\scrapping\drivers\msedgedriver.exe"
+nombre_arch = 'prueba.csv'
+dir_archivo = f'C:/Users/Francisco/Desktop/DEV_STUFF/00_OPTIBOT/automatizacion-wp/fran-with-ai/scrapping/archivos/{nombre_arch}'
+
+
+def buscar_lead(numero_contacto):
+    try:
+        response = supabase.table("leads").select("*").eq("id", numero_contacto).limit(1).execute()
+        data = response.data
+        if data:
+            print("ℹ️ Lead encontrado:", data[0])
+            return data[0]  # lead existente
+        else:
+            print("✅ Lead no existe aún. Hay que crearlo")
+            return None  # lead no encontrado
+    except Exception as e:
+        print("❌ Error al buscar lead:", e)
+        return None
+
+# Función para insertar contacto
+def insertar_lead(numero_contacto):
+    nuevo_lead = {
+        "id": numero_contacto,
+        "is_active": True,
+        "origin": admin_phone,
+        "current_step": "greeting",
+    }
+    try:
+        response = supabase.table("leads").insert(nuevo_lead).execute()
+        print("✅ Lead insertado correctamente:", response.data)
+        return True
+    except Exception as e:
+        print("❌ Error al insertar lead:", e)
+        return False
+
+# Insertar mensaje en chats
+def insertar_chat(numero_contacto, mensaje):
+    nuevo_chat = {
+        "session_id": numero_contacto,
+        "message": mensaje,
+        "is_from_user": False,
+        "metadata": {}
+    }
+    try:
+        response = supabase.table("chats").insert(nuevo_chat).execute()
+        print("✅ mensaje guardado en chats", response.data)
+        return True
+    except Exception as e:
+        print("❌ Error al insertar chat:", e)
+        return False
+
 
 def espera_random(desde, hasta):
     return round(random.uniform(desde, hasta), 1)
 
-# Configuración
-EDGE_DRIVER_PATH = r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\msedgedriver.exe"
 
 def iniciar_navegador():
     options = Options()
@@ -80,25 +141,52 @@ def enviar_mensaje(driver, numero, mensaje):
         
         # Paso 5: Intentar hacer click en el contacto
         try:
-            # xpath_contact = '//*[@id="app"]/div/div[3]/div/div[2]/div[1]/span/div/span/div/div[2]/div[2]/div/div/div[2]/div'
             xpath_contact = '//*[@id="app"]/div/div[3]/div/div[2]/div[1]/span/div/span/div/div[2]/div[3]'
             contact_btn = WebDriverWait(driver, random.randint(2, 3)).until(
                 EC.element_to_be_clickable((By.XPATH, xpath_contact)))
-            contact_btn.click()
         except:
-            print(f"❌ No se encontró el contacto {numero} - Saltando...")
-            # Limpiar búsqueda fallida
-            input_search.send_keys(Keys.CONTROL + 'a', Keys.BACKSPACE)
-            xpath_back = '//*[@id="app"]/div/div[3]/div/div[2]/div[1]/span/div/span/div/header/div/div[1]/div'
-            back_btn = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, xpath_back)))
-            back_btn.click()
-
-            return False
+            print('No encontró el primer xpath del contacto, va al segundo de nro conocido')
+            try:
+                xpath_contact = '//*[@id="app"]/div[1]/div[3]/div/div[2]/div[1]/span/div/span/div/div[2]/div[2]/div/div/div[2]/div'
+                contact_btn = WebDriverWait(driver, random.randint(2, 3)).until(
+                    EC.element_to_be_clickable((By.XPATH, xpath_contact))
+                )
+            except:
+                print(f"❌ No se encontró el contacto {numero} - Saltando...")
+                # Limpiar búsqueda fallida
+                input_search.send_keys(Keys.CONTROL + 'a', Keys.BACKSPACE)
+                xpath_back = '//*[@id="app"]/div/div[3]/div/div[2]/div[1]/span/div/span/div/header/div/div[1]/div'
+                back_btn = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, xpath_back)))
+                back_btn.click()
+                return False
+        
+        contact_btn.click()
+        print(f"✅ Botón de contacto encontrado")
         
         # Paso 6: Pegar mensaje (el input ya está autoseleccionado)
         time.sleep(espera_random(2, 4))
-        msg_input = driver.switch_to.active_element
-        msg_input.send_keys(f'{mensaje}')
+        # msg_input = driver.switch_to.active_element
+        msg_input = driver.find_element(By.XPATH, '//*[@id="main"]/footer//div[@contenteditable="true"]')
+        # msg_input = driver.find_element(By.XPATH, '//*[@id="main"]/footer/div[1]/div/span/div/div[2]/div/div[3]/div[1]//div[@contenteditable="true"]')
+        # msg_input.send_keys(mensaje)
+
+        driver.execute_script("""
+            var element = arguments[0];
+            var text = arguments[1];
+            
+            element.focus();
+            element.innerText = text;
+            
+            // Dispara eventos con pequeño retraso
+            setTimeout(function() {
+                var evt = new InputEvent('input', {
+                    bubbles: true,
+                    data: text,
+                    inputType: 'insertText'
+                });
+                element.dispatchEvent(evt);
+            }, 100);
+        """, msg_input, mensaje)
         
         # Paso 7: Enviar mensaje
         send_btn = WebDriverWait(driver, 5).until(
@@ -134,20 +222,18 @@ def main():
     try:
         driver.get("https://web.whatsapp.com")
         esperar_sesion(driver)
-        
-        nombre_arch = 'tatuajes_2.csv'
-        df = pd.read_csv(nombre_arch)
+        df = pd.read_csv(dir_archivo)
         # df = pd.read_csv(nombre_arch, header=None, skiprows=1)
         if df.empty:
             print("❌ Error : el archivo origen esta vacio")
             return
         n_muestra = random.randint(10, 20)
         df_contactar = None
-        # Tomar las primeras 20 filas (o menos si hay menos)
+        # Tomar las primeras filas en base a la muestra (o menos si hay menos)
         df_contactar = df.head(n_muestra)
         # Guardar el CSV original sin las primeras 20 filas
-        df_sin_20 = df.iloc[n_muestra:]
-        df_sin_20.to_csv(nombre_arch, index=False)
+        df_con_menos_data = df.iloc[n_muestra:]
+        df_con_menos_data.to_csv(dir_archivo, index=False)
         
         if not df_contactar.empty:
             for indice, fila in df_contactar.iterrows():
@@ -155,19 +241,39 @@ def main():
                 numero = fila[2].replace(' ', '').replace('-', '')
                 numero = f'351{numero[-7:]}'
                 # numero = fila[2]
-                mensaje = f"Hola {negocio}! Queremos acercarte opciones de cobertura médica con Sancor Salud, Prevención Salud y Avalian. ¿Querés que te contemos cómo funciona? Estamos para ayudarte sin compromiso."
+                # ver si existe el lead
+                lead = buscar_lead(numero)
+                if lead:
+                    print("❌ El LEAD ya existe no se enviara el mensaje")
+                    continue
+                mensaje = f'¡Hola {negocio}!\nDesde *Precios de Prepagas*, te acercamos propuestas de cobertura médica pensadas para PyMEs como la tuya.\nComercializamos planes corporativos de *Sancor Salud*, *Prevención Salud* y *Avalian*.\nPodés armar tu grupo a partir de *5 personas*, que pueden ser empleados o familiares, con planes y tarifas especiales. También tenemos beneficios adicionales para grupos de más de 30 personas.\n¿Querés conocer las opciones? Simplemente respondé "SÍ" para que podamos ayudarte a encontrar la mejor propuesta sin compromiso.'
+                # mensaje = f"""¡Hola {negocio}! 👋
+
+                # Desde **Precios de Prepagas**, te acercamos propuestas de cobertura médica pensadas para PyMEs como la tuya.
+
+                # Somos asesores oficiales de **Sancor Salud**, **Prevención Salud** y **Avalian** 🏥.
+
+                # Podés armar tu grupo a partir de **5 personas**, que pueden ser empleados o familiares, con planes y tarifas especiales. También tenemos beneficios adicionales para grupos de más de 30 personas.
+
+                # ¿Querés conocer las opciones? Simplemente respondé "SÍ" para que podamos ayudarte a encontrar la mejor propuesta sin compromiso."""
                 # print(f'{numero} {mensaje}')
                 mover_mouse_random(driver)
-                enviar_mensaje(driver, numero, mensaje)
+                envio = enviar_mensaje(driver, numero, mensaje)
+                if envio:
+                    # se guarda el lead y el chat
+                    nuevo_lead = insertar_lead(numero)
+                    if nuevo_lead:
+                        insertar_chat(numero, mensaje)
+
         else:
-            print("❌ Error : primeros_20 esta vacio")
+            print("❌ Error : no hay datos para contactar")
             
         print("🎉 Proceso completado")
         
     except Exception as e:
         print(f"❌ Error crítico: {str(e)}")
     finally:
-        print(1)
+        print("Terminó el script")
         # driver.quit()
 
 if __name__ == "__main__":
