@@ -12,6 +12,7 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 from supabase import create_client
+import re
 
 # Configuración
 load_dotenv(dotenv_path=r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\fran-with-ai\scrapping\.env")
@@ -189,8 +190,13 @@ def enviar_mensaje(driver, numero, mensaje):
         """, msg_input, mensaje)
         
         # Paso 7: Enviar mensaje
-        send_btn = WebDriverWait(driver, 5).until(
+        try:
+            send_btn = WebDriverWait(driver, 5).until(
             EC.element_to_be_clickable((By.XPATH, '//button[@aria-label="Send"]')))
+        except Exception as e:
+            print(e)
+            time.sleep(200)
+        
         send_btn.click()
         
         print(f"✅ Mensaje enviado a {numero}")
@@ -232,21 +238,22 @@ def main():
         # Tomar las primeras filas en base a la muestra (o menos si hay menos)
         df_contactar = df.head(n_muestra)
         # Guardar el CSV original sin las primeras 20 filas
-        df_con_menos_data = df.iloc[n_muestra:]
-        df_con_menos_data.to_csv(dir_archivo, index=False)
+        df_sin_muestra = df.iloc[n_muestra:]
+        df_sin_muestra.to_csv(dir_archivo, index=False)
         
         if not df_contactar.empty:
             for indice, fila in df_contactar.iterrows():
                 negocio = fila[0]
-                numero = fila[2].replace(' ', '').replace('-', '')
-                numero = f'351{numero[-7:]}'
+                numero = re.sub(r'\D', '', str(fila[2]))
+                # numero = fila[2].replace('+', '').replace(' ', '').replace('-', '')
+                # numero = f'351{numero[-7:]}'
                 # numero = fila[2]
                 # ver si existe el lead
                 lead = buscar_lead(numero)
                 if lead:
                     print("❌ El LEAD ya existe no se enviara el mensaje")
                     continue
-                mensaje = f'¡Hola {negocio}!\nDesde *Precios de Prepagas*, te acercamos propuestas de cobertura médica pensadas para PyMEs como la tuya.\nComercializamos planes corporativos de *Sancor Salud*, *Prevención Salud* y *Avalian*.\nPodés armar tu grupo a partir de *5 personas*, que pueden ser empleados o familiares, con planes y tarifas especiales. También tenemos beneficios adicionales para grupos de más de 30 personas.\n¿Querés conocer las opciones? Simplemente respondé "SÍ" para que podamos ayudarte a encontrar la mejor propuesta sin compromiso.'
+                mensaje = f'¡Hola {negocio}!\n\nDesde *Precios de Prepagas*, te acercamos propuestas de cobertura médica pensadas para PyMEs como la tuya.\nComercializamos *Sancor Salud*, *Prevención Salud* y *Avalian*.\n\nPodés armar tu grupo a partir de *5 personas*, que pueden ser empleados o familiares, con planes y tarifas especiales. También tenemos beneficios adicionales para grupos de más de 30 personas.\n\n¿Querés conocer las opciones? Simplemente respondé "SÍ" para que podamos ayudarte a encontrar la mejor propuesta sin compromiso.'
                 # mensaje = f"""¡Hola {negocio}! 👋
 
                 # Desde **Precios de Prepagas**, te acercamos propuestas de cobertura médica pensadas para PyMEs como la tuya.
