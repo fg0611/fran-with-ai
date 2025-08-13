@@ -15,16 +15,16 @@ from supabase import create_client
 import re
 
 # Configuración
-load_dotenv(dotenv_path=r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\fran-with-ai\scrapping\.env")
+load_dotenv(dotenv_path=r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\fran-with-ai\send\.env")
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
 admin_phone = os.environ.get("ADMIN_PHONE")
 
 supabase = create_client(url, key)
 
-EDGE_DRIVER_PATH = r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\fran-with-ai\scrapping\drivers\msedgedriver.exe"
-nombre_arch = 'prueba.csv'
-dir_archivo = f'C:/Users/Francisco/Desktop/DEV_STUFF/00_OPTIBOT/automatizacion-wp/fran-with-ai/scrapping/archivos/{nombre_arch}'
+EDGE_DRIVER_PATH = r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\fran-with-ai\send\drivers\msedgedriver.exe"
+nombre_arch = 'result.csv'
+dir_archivo = f'C:/Users/Francisco/Desktop/DEV_STUFF/00_OPTIBOT/automatizacion-wp/fran-with-ai/send/archivos/{nombre_arch}'
 
 
 def buscar_lead(numero_contacto):
@@ -35,7 +35,7 @@ def buscar_lead(numero_contacto):
             print("ℹ️ Lead encontrado:", data[0])
             return data[0]  # lead existente
         else:
-            print("✅ Lead no existe aún. Hay que crearlo")
+            print("ℹ️ El Lead no existe aún")
             return None  # lead no encontrado
     except Exception as e:
         print("❌ Error al buscar lead:", e)
@@ -73,10 +73,8 @@ def insertar_chat(numero_contacto, mensaje):
         print("❌ Error al insertar chat:", e)
         return False
 
-
 def espera_random(desde, hasta):
     return round(random.uniform(desde, hasta), 1)
-
 
 def iniciar_navegador():
     options = Options()
@@ -193,18 +191,16 @@ def enviar_mensaje(driver, numero, mensaje):
         try:
             send_btn = WebDriverWait(driver, 5).until(
             EC.element_to_be_clickable((By.XPATH, '//button[@aria-label="Send"]')))
+            send_btn.click()
+            print(f"✅ Mensaje enviado a {numero}")
+            time.sleep(espera_random(2, 4))  # Esperar entre mensajes
+            return True
         except Exception as e:
-            print(e)
-            time.sleep(200)
-        
-        send_btn.click()
-        
-        print(f"✅ Mensaje enviado a {numero}")
-        time.sleep(espera_random(2, 4))  # Esperar entre mensajes
-        return True
-        
+            print(f"❌ No se pudo enviar el mensaje a {numero}. Error: {e}")
+            return False
+            
     except Exception as e:
-        print(f"⚠️ Error con {numero}: {str(e)}")
+        print(f"❌ Ocurrió un error general: {e}")
         return False
     
 def mover_mouse_random(driver):
@@ -228,52 +224,73 @@ def main():
     try:
         driver.get("https://web.whatsapp.com")
         esperar_sesion(driver)
-        df = pd.read_csv(dir_archivo)
-        # df = pd.read_csv(nombre_arch, header=None, skiprows=1)
-        if df.empty:
+
+        conteo = pd.read_csv(dir_archivo).shape[0]
+        
+        if not conteo:
             print("❌ Error : el archivo origen esta vacio")
             return
-        n_muestra = random.randint(10, 20)
-        df_contactar = None
-        # Tomar las primeras filas en base a la muestra (o menos si hay menos)
-        df_contactar = df.head(n_muestra)
-        # Guardar el CSV original sin las primeras 20 filas
-        df_sin_muestra = df.iloc[n_muestra:]
-        df_sin_muestra.to_csv(dir_archivo, index=False)
         
-        if not df_contactar.empty:
+        historial_csv = "enviados.csv"
+        contactados = 0
+        pausa_larga = random.uniform(120, 300)
+
+        while conteo:
+            df = pd.read_csv(dir_archivo)
+            # df = pd.read_csv(nombre_arch, header=None, skiprows=1)
+            n_muestra = random.randint(1, 3)
+
+            df_contactar = df.head(n_muestra)
+            df_sin_muestra = df.iloc[n_muestra:]
+            conteo = df_sin_muestra.shape[0]
+            # Guardar el CSV original sin las filas usadas
+            df_sin_muestra.to_csv(dir_archivo, index=False)
+            # Tomar las primeras filas en base a la muestra (o menos si hay menos)
+            # CSV acumulativo
+            
             for indice, fila in df_contactar.iterrows():
+
+                if contactados >= n_muestra:
+                    print(f"⏳ Pausa de {pausa_larga/60:.1f} minutos antes del próximo lote...")
+                    time.sleep(pausa_larga)
+                    contactados = 0  # Reiniciar contador
+                    pausa_larga = random.uniform(120, 300)  # Nueva pausa aleatoria                
+
                 negocio = fila[0]
-                numero = re.sub(r'\D', '', str(fila[2]))
-                # numero = fila[2].replace('+', '').replace(' ', '').replace('-', '')
-                # numero = f'351{numero[-7:]}'
-                # numero = fila[2]
+                numero = fila[2]
+                # numero = re.sub(r'\D', '', str(fila[2]))
                 # ver si existe el lead
                 lead = buscar_lead(numero)
                 if lead:
                     print("❌ El LEAD ya existe no se enviara el mensaje")
                     continue
+
                 mensaje = f'¡Hola {negocio}!\n\nDesde *Precios de Prepagas*, te acercamos propuestas de cobertura médica pensadas para PyMEs como la tuya.\nComercializamos *Sancor Salud*, *Prevención Salud* y *Avalian*.\n\nPodés armar tu grupo a partir de *5 personas*, que pueden ser empleados o familiares, con planes y tarifas especiales. También tenemos beneficios adicionales para grupos de más de 30 personas.\n\n¿Querés conocer las opciones? Simplemente respondé "SÍ" para que podamos ayudarte a encontrar la mejor propuesta sin compromiso.'
-                # mensaje = f"""¡Hola {negocio}! 👋
-
-                # Desde **Precios de Prepagas**, te acercamos propuestas de cobertura médica pensadas para PyMEs como la tuya.
-
-                # Somos asesores oficiales de **Sancor Salud**, **Prevención Salud** y **Avalian** 🏥.
-
-                # Podés armar tu grupo a partir de **5 personas**, que pueden ser empleados o familiares, con planes y tarifas especiales. También tenemos beneficios adicionales para grupos de más de 30 personas.
-
-                # ¿Querés conocer las opciones? Simplemente respondé "SÍ" para que podamos ayudarte a encontrar la mejor propuesta sin compromiso."""
-                # print(f'{numero} {mensaje}')
                 mover_mouse_random(driver)
                 envio = enviar_mensaje(driver, numero, mensaje)
+                # --- Lógica de actualización de CSV e inserción en Supabase ---
                 if envio:
-                    # se guarda el lead y el chat
+                    contactados += 1
+                    df_contactar.loc[indice, "enviado"] = True
+                    print(f"✅ Mensaje enviado y se guardará el lead en Supabase")
+                    
+                    # Insertar en Supabase solo si el mensaje se envió
                     nuevo_lead = insertar_lead(numero)
                     if nuevo_lead:
                         insertar_chat(numero, mensaje)
-
-        else:
-            print("❌ Error : no hay datos para contactar")
+                else:
+                    df_contactar.loc[indice, "enviado"] = False
+                    print(f"❌ Mensaje no enviado. No se creará el lead en Supabase, pero se guardará en el historial.")
+                
+                # Guardar en histórico acumulativo, independientemente del resultado del envío
+                if os.path.exists(historial_csv):
+                    df_hist = pd.read_csv(historial_csv)
+                    df_hist = pd.concat([df_hist, df_contactar.loc[[indice]]], ignore_index=True)
+                else:
+                    df_hist = df_contactar.loc[[indice]]
+                
+                df_hist.to_csv(historial_csv, index=False)
+                # -------------------------------------------------------------             
             
         print("🎉 Proceso completado")
         

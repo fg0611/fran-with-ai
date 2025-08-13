@@ -2,6 +2,7 @@
 node_modules/
 drivers/
 session/
+auth/
 
 # Logs
 logs
@@ -275,4 +276,7 @@ Thumbs.db
 
 # Custom folders
 archivos/
+
+# csvs
+*.csv
 
