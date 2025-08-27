@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 import os
 from supabase import create_client
 import re
+from datetime import datetime
 
 # Configuración
 load_dotenv(dotenv_path=r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\fran-with-ai\send\.env")
@@ -23,9 +24,15 @@ admin_phone = os.environ.get("ADMIN_PHONE")
 supabase = create_client(url, key)
 
 EDGE_DRIVER_PATH = r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\fran-with-ai\send\drivers\msedgedriver.exe"
-nombre_arch = 'result.csv'
-dir_archivo = f'C:/Users/Francisco/Desktop/DEV_STUFF/00_OPTIBOT/automatizacion-wp/fran-with-ai/send/archivos/{nombre_arch}'
+busqueda = 'diseno'
+dir_archivo = f'C:/Users/Francisco/Desktop/DEV_STUFF/00_OPTIBOT/automatizacion-wp/fran-with-ai/send/archivos/{busqueda}.csv'
 
+fecha_envio = datetime.now().isoformat(timespec='minutes').replace(':', '-')
+historial_csv = f'enviados-{busqueda}-{fecha_envio}.csv'
+
+def limpiar_string(s):
+    return re.sub(r'[^\w\s]', '', s, flags=re.UNICODE)
+    # return re.sub(r'[^a-zA-Z0-9\s]', '', s)
 
 def buscar_lead(numero_contacto):
     try:
@@ -42,11 +49,12 @@ def buscar_lead(numero_contacto):
         return None
 
 # Función para insertar contacto
-def insertar_lead(numero_contacto):
+def insertar_lead(numero_contacto, nombre):
     nuevo_lead = {
         "id": numero_contacto,
         "is_active": True,
         "origin": admin_phone,
+        "name": nombre,
         "current_step": "greeting",
     }
     try:
@@ -93,7 +101,7 @@ def esperar_sesion(driver):
         # 1. Esperar a que desaparezca el QR (máximo 2 minutos)
         WebDriverWait(driver, 120).until(
             EC.invisibility_of_element_located((By.XPATH, '//canvas[@aria-label="Scan me!"]')))
-        print("🔄 QR escaneado correctamente")
+        print("🔄 QR disponible")
         
         # 2. Esperar y cerrar el modal de bienvenida (si existe)
         try:
@@ -231,13 +239,12 @@ def main():
             print("❌ Error : el archivo origen esta vacio")
             return
         
-        historial_csv = "enviados.csv"
         contactados = 0
         pausa_larga = random.uniform(120, 300)
 
         while conteo:
             df = pd.read_csv(dir_archivo)
-            # df = pd.read_csv(nombre_arch, header=None, skiprows=1)
+            # df = pd.read_csv(busqueda, header=None, skiprows=1)
             n_muestra = random.randint(1, 3)
 
             df_contactar = df.head(n_muestra)
@@ -256,7 +263,7 @@ def main():
                     contactados = 0  # Reiniciar contador
                     pausa_larga = random.uniform(120, 300)  # Nueva pausa aleatoria                
 
-                negocio = fila[0]
+                negocio = limpiar_string(fila[0]) if fila[0] else fila[0]
                 numero = fila[2]
                 # numero = re.sub(r'\D', '', str(fila[2]))
                 # ver si existe el lead
@@ -265,7 +272,7 @@ def main():
                     print("❌ El LEAD ya existe no se enviara el mensaje")
                     continue
 
-                mensaje = f'¡Hola {negocio}!\n\nDesde *Precios de Prepagas*, te acercamos propuestas de cobertura médica pensadas para PyMEs como la tuya.\nComercializamos *Sancor Salud*, *Prevención Salud* y *Avalian*.\n\nPodés armar tu grupo a partir de *5 personas*, que pueden ser empleados o familiares, con planes y tarifas especiales. También tenemos beneficios adicionales para grupos de más de 30 personas.\n\n¿Querés conocer las opciones? Simplemente respondé "SÍ" para que podamos ayudarte a encontrar la mejor propuesta sin compromiso.'
+                mensaje = f'¡Hola *{negocio}*!\n\nDesde *Precios de Prepagas*, te acercamos propuestas de cobertura médica para particulares, familias y *PyMEs*.\nComercializamos *Sancor Salud*, *Prevención Salud* y *Avalian*.\n\nSi sos PyME, podés armar tu grupo a partir de *5 personas*, que pueden ser empleados o familiares, con planes y tarifas especiales. También tenemos beneficios adicionales para grupos de más de 30 personas.\n\n¿Querés conocer las opciones? Simplemente respondé *SÍ* o *Info* para que podamos ayudarte a encontrar la mejor propuesta sin compromiso.'
                 mover_mouse_random(driver)
                 envio = enviar_mensaje(driver, numero, mensaje)
                 # --- Lógica de actualización de CSV e inserción en Supabase ---
@@ -275,7 +282,7 @@ def main():
                     print(f"✅ Mensaje enviado y se guardará el lead en Supabase")
                     
                     # Insertar en Supabase solo si el mensaje se envió
-                    nuevo_lead = insertar_lead(numero)
+                    nuevo_lead = insertar_lead(numero, negocio)
                     if nuevo_lead:
                         insertar_chat(numero, mensaje)
                 else:

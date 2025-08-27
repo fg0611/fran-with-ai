@@ -5,5 +5,5 @@ conda create -n myenv python=3.9
 conda create -p /path/to/myenv
 conda activate myenv   
 conda activate /path/to/myenv
-conda list nombre_de_la_libreria
+conda list nombre_de_la_libreria   
 Note: Use conda env list to view all environments.

@@ -4,6 +4,7 @@ conda create -n myenv python=3.9
 conda create -p /path/to/myenv
 conda activate myenv   
 conda activate /path/to/myenv
+conda activate whatsapp_env
 Note: Use conda env list to view all environments.
 
 pip install scrapy scrapy-zyte-api
@@ -11,7 +12,7 @@ scrapy startproject maps_scraper
 scrapy genspider googlemaps_spider maps.googleapis.com
 
 
-shub login 
+shub login
 shub logout
 shub deploy <your project ID>
 shub schedule <spider name>

@@ -1,0 +1,227 @@
+PANDAS + SQL CHEATSHEET PARA ETL CON CSVs
+=========================================
+
+IMPORTACIÓN Y EXPORTACIÓN DE DATOS
+-----------------------------------
+# Leer CSV local
+df = pd.read_csv("ruta/origen.csv")
+-- SQL: SELECT * FROM origen;
+
+# Guardar a CSV
+df.to_csv("ruta/destino.csv", index=False)
+-- SQL: INSERT INTO destino SELECT * FROM origen;
+
+# Leer Excel
+df = pd.read_excel("archivo.xlsx")
+-- SQL: SELECT * FROM archivo_excel;
+
+# Leer desde JSON
+df = pd.read_json("archivo.json")
+-- SQL: SELECT * FROM archivo_json;
+
+# Guardar a Excel
+df.to_excel("archivo.xlsx", index=False)
+-- SQL: INSERT INTO tabla_excel (...);
+
+-----------------------------------------------------
+INSPECCIÓN Y EXPLORACIÓN DE DATOS
+-----------------------------------------------------
+df.head()                      # Primeras filas
+-- SQL: SELECT * FROM tabla LIMIT 5;
+
+df.tail()                      # Últimas filas
+-- SQL: SELECT * FROM tabla ORDER BY id DESC LIMIT 5;
+
+df.info()                      # Estructura de la tabla
+-- SQL: \d tabla;
+
+df.describe()                  # Estadísticas numéricas
+-- SQL: SELECT AVG(col), MIN(col), MAX(col), STDDEV(col) FROM tabla;
+
+df.columns                     # Lista de columnas
+-- SQL: SELECT column_name FROM information_schema.columns WHERE table_name='tabla';
+
+df.shape                       # (filas, columnas)
+-- SQL: SELECT COUNT(*) AS filas, COUNT(column_name) AS columnas FROM tabla;
+
+-----------------------------------------------------
+SELECCIÓN Y FILTRADO DE DATOS
+-----------------------------------------------------
+df['columna']                  # Selección de una columna
+-- SQL: SELECT columna FROM tabla;
+
+df[['col1','col2']]            # Selección múltiple
+-- SQL: SELECT col1, col2 FROM tabla;
+
+df.loc[5]                      # Fila por índice
+-- SQL: SELECT * FROM tabla WHERE id = 5;
+
+df.iloc[0:5]                   # Filas por posición
+-- SQL: SELECT * FROM tabla OFFSET 0 LIMIT 5;
+
+df[df['columna'] > 100]        # Filtrar por condición
+-- SQL: SELECT * FROM tabla WHERE columna > 100;
+
+df[(df['col1'] > 100) & (df['col2'] == 'A')]
+-- SQL: SELECT * FROM tabla WHERE col1 > 100 AND col2 = 'A';
+
+df[df['columna'].isin([1,2,3])]
+-- SQL: SELECT * FROM tabla WHERE columna IN (1,2,3);
+
+df[~df['columna'].isin([1,2,3])]
+-- SQL: SELECT * FROM tabla WHERE columna NOT IN (1,2,3);
+
+-----------------------------------------------------
+ORDENAMIENTO Y AGRUPACIÓN
+-----------------------------------------------------
+df.sort_values(by='columna', ascending=True)
+-- SQL: SELECT * FROM tabla ORDER BY columna ASC;
+
+df.groupby('columna').sum()
+-- SQL: SELECT columna, SUM(*) FROM tabla GROUP BY columna;
+
+df.groupby(['col1','col2']).agg({'col3':'mean', 'col4':'max'})
+-- SQL: SELECT col1, col2, AVG(col3), MAX(col4) FROM tabla GROUP BY col1, col2;
+
+-----------------------------------------------------
+EDICIÓN Y TRANSFORMACIÓN DE DATOS
+-----------------------------------------------------
+# Renombrar columnas
+df.rename(columns={'vieja':'nueva'}, inplace=True)
+-- SQL: ALTER TABLE tabla RENAME COLUMN vieja TO nueva;
+
+# Crear nueva columna
+df['nueva'] = df['col1'] + df['col2']
+-- SQL: ALTER TABLE tabla ADD COLUMN nueva tipo;
+-- SQL: UPDATE tabla SET nueva = col1 + col2;
+
+# Aplicar función a una columna
+df['columna'] = df['columna'].apply(lambda x: x.upper())
+-- SQL: UPDATE tabla SET columna = UPPER(columna);
+
+# Cambiar tipo de dato
+df['columna'] = df['columna'].astype(float)
+-- SQL: ALTER TABLE tabla ALTER COLUMN columna TYPE float;
+
+# Reemplazar valores
+df['columna'] = df['columna'].replace({'antiguo':'nuevo'})
+-- SQL: UPDATE tabla SET columna = 'nuevo' WHERE columna = 'antiguo';
+
+# Eliminar columnas
+df.drop(columns=['columna'], inplace=True)
+-- SQL: ALTER TABLE tabla DROP COLUMN columna;
+
+# Eliminar filas por índice
+df.drop(index=[0,1], inplace=True)
+-- SQL: DELETE FROM tabla WHERE id IN (valor0, valor1);
+
+# Eliminar duplicados
+df.drop_duplicates(inplace=True)
+-- SQL: DELETE FROM tabla t1 USING tabla t2 WHERE t1.id < t2.id AND t1.campo = t2.campo;
+
+-----------------------------------------------------
+OPERACIONES AVANZADAS
+-----------------------------------------------------
+# Join/Merge
+pd.merge(df1, df2, on='id', how='inner')
+-- SQL: SELECT * FROM df1 INNER JOIN df2 USING (id);
+
+pd.merge(df1, df2, on='id', how='left')
+-- SQL: SELECT * FROM df1 LEFT JOIN df2 USING (id);
+
+# Concatenar datasets
+pd.concat([df1, df2], ignore_index=True)
+-- SQL: SELECT * FROM df1 UNION ALL SELECT * FROM df2;
+
+# Pivot Table
+df.pivot_table(values='ventas', index='mes', columns='producto', aggfunc='sum')
+-- SQL: SELECT mes, producto, SUM(ventas) FROM tabla GROUP BY mes, producto;
+
+-----------------------------------------------------
+LIMPIEZA DE DATOS
+-----------------------------------------------------
+df.dropna()                    # Eliminar filas con NaN
+-- SQL: DELETE FROM tabla WHERE columna IS NULL;
+
+df.fillna(0)                   # Reemplazar NaN por 0
+-- SQL: UPDATE tabla SET columna = 0 WHERE columna IS NULL;
+
+df['columna'] = df['columna'].str.strip()  # Quitar espacios
+-- SQL: UPDATE tabla SET columna = TRIM(columna);
+
+-----------------------------------------------------
+FLUJO ETL COMPLETO (EJEMPLO)
+-----------------------------------------------------
+import pandas as pd
+
+# 1. EXTRAER
+ventas = pd.read_csv("data/ventas.csv")    # SELECT * FROM ventas;
+clientes = pd.read_csv("data/clientes.csv")# SELECT * FROM clientes;
+
+# 2. TRANSFORMAR
+# Filtrar solo ventas mayores a 1000
+ventas = ventas[ventas['monto'] > 1000]    # WHERE monto > 1000
+
+# Unir con clientes
+df_final = pd.merge(ventas, clientes, on='cliente_id', how='left') # LEFT JOIN
+
+# Calcular columna nueva
+df_final['monto_usd'] = df_final['monto'] / 950  # tasa ficticia
+
+# Limpiar espacios y poner nombres en mayúsculas
+df_final['nombre_cliente'] = df_final['nombre_cliente'].str.strip().str.upper()
+
+# Eliminar duplicados
+df_final.drop_duplicates(inplace=True)
+
+# 3. CARGAR
+df_final.to_csv("data/ventas_procesadas.csv", index=False)
+-- SQL equivalente:
+-- DELETE FROM ventas_procesadas;
+-- INSERT INTO ventas_procesadas SELECT ...;
+
+TRUCOS RÁPIDOS DE PANDAS PARA ETL
+=================================
+
+# Cargar solo columnas necesarias
+df = pd.read_csv("archivo.csv", usecols=['col1', 'col3'])
+-- SQL: SELECT col1, col3 FROM tabla;
+
+# Leer por chunks (para archivos grandes)
+chunk_size = 50000
+for chunk in pd.read_csv("archivo.csv", chunksize=chunk_size):
+    procesar(chunk)
+-- SQL: SELECT * FROM tabla LIMIT 50000 OFFSET ...;
+
+# Leer con conversión de tipos al cargar (optimiza memoria)
+df = pd.read_csv("archivo.csv", dtype={'columna': 'int32'})
+-- SQL: ALTER TABLE tabla ALTER COLUMN columna TYPE INTEGER;
+
+# Filtros rápidos con query()
+df_filtrado = df.query("col1 > 100 and col2 == 'A'")
+-- SQL: SELECT * FROM tabla WHERE col1 > 100 AND col2 = 'A';
+
+# Filtrar y seleccionar columnas en una sola línea
+df_resultado = df.query("monto > 5000")[['id', 'monto']]
+-- SQL: SELECT id, monto FROM tabla WHERE monto > 5000;
+
+# Aplicar múltiples transformaciones encadenadas
+df = (df
+      .query("monto > 5000")
+      .assign(monto_usd=lambda x: x['monto'] / 950)
+      .drop_duplicates()
+      .sort_values(by='monto_usd', ascending=False)
+)
+-- SQL: 
+-- SELECT DISTINCT *, monto/950 AS monto_usd 
+-- FROM tabla 
+-- WHERE monto > 5000 
+-- ORDER BY monto_usd DESC;
+
+# Renombrar columnas al leer
+df = pd.read_csv("archivo.csv", names=['id','nombre','monto'], header=0)
+-- SQL: SELECT id AS nuevo_id, nombre AS nuevo_nombre, monto FROM tabla;
+
+# Guardar solo ciertas columnas en CSV final
+df[['col1','col3']].to_csv("destino.csv", index=False)
+-- SQL: INSERT INTO destino (col1, col3) SELECT col1, col3 FROM origen;
