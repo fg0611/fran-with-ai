@@ -9,22 +9,15 @@ from selenium.webdriver.common.action_chains import ActionChains
 import time
 import random
 import pandas as pd
-from dotenv import load_dotenv
 import os
-from supabase import create_client
 import re
 from datetime import datetime
+from db_ops import buscar_lead, insertar_lead, insertar_chat
+from plantillas import elaborar_mensaje
 
-# Configuración
-load_dotenv(dotenv_path=r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\fran-with-ai\send\.env")
-url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
-admin_phone = os.environ.get("ADMIN_PHONE")
-
-supabase = create_client(url, key)
 
 EDGE_DRIVER_PATH = r"C:\Users\Francisco\Desktop\DEV_STUFF\00_OPTIBOT\automatizacion-wp\fran-with-ai\send\drivers\msedgedriver.exe"
-busqueda = 'diseno'
+busqueda = 'db2'
 dir_archivo = f'C:/Users/Francisco/Desktop/DEV_STUFF/00_OPTIBOT/automatizacion-wp/fran-with-ai/send/archivos/{busqueda}.csv'
 
 fecha_envio = datetime.now().isoformat(timespec='minutes').replace(':', '-')
@@ -33,53 +26,6 @@ historial_csv = f'enviados-{busqueda}-{fecha_envio}.csv'
 def limpiar_string(s):
     return re.sub(r'[^\w\s]', '', s, flags=re.UNICODE)
     # return re.sub(r'[^a-zA-Z0-9\s]', '', s)
-
-def buscar_lead(numero_contacto):
-    try:
-        response = supabase.table("leads").select("*").eq("id", numero_contacto).limit(1).execute()
-        data = response.data
-        if data:
-            print("ℹ️ Lead encontrado:", data[0])
-            return data[0]  # lead existente
-        else:
-            print("ℹ️ El Lead no existe aún")
-            return None  # lead no encontrado
-    except Exception as e:
-        print("❌ Error al buscar lead:", e)
-        return None
-
-# Función para insertar contacto
-def insertar_lead(numero_contacto, nombre):
-    nuevo_lead = {
-        "id": numero_contacto,
-        "is_active": True,
-        "origin": admin_phone,
-        "name": nombre,
-        "current_step": "greeting",
-    }
-    try:
-        response = supabase.table("leads").insert(nuevo_lead).execute()
-        print("✅ Lead insertado correctamente:", response.data)
-        return True
-    except Exception as e:
-        print("❌ Error al insertar lead:", e)
-        return False
-
-# Insertar mensaje en chats
-def insertar_chat(numero_contacto, mensaje):
-    nuevo_chat = {
-        "session_id": numero_contacto,
-        "message": mensaje,
-        "is_from_user": False,
-        "metadata": {}
-    }
-    try:
-        response = supabase.table("chats").insert(nuevo_chat).execute()
-        print("✅ mensaje guardado en chats", response.data)
-        return True
-    except Exception as e:
-        print("❌ Error al insertar chat:", e)
-        return False
 
 def espera_random(desde, hasta):
     return round(random.uniform(desde, hasta), 1)
@@ -263,7 +209,7 @@ def main():
                     contactados = 0  # Reiniciar contador
                     pausa_larga = random.uniform(120, 300)  # Nueva pausa aleatoria                
 
-                negocio = limpiar_string(fila[0]) if fila[0] else fila[0]
+                nombre = limpiar_string(fila[0]) if fila[0] else fila[0]
                 numero = fila[2]
                 # numero = re.sub(r'\D', '', str(fila[2]))
                 # ver si existe el lead
@@ -272,8 +218,9 @@ def main():
                     print("❌ El LEAD ya existe no se enviara el mensaje")
                     continue
 
-                mensaje = f'¡Hola *{negocio}*!\n\nDesde *Precios de Prepagas*, te acercamos propuestas de cobertura médica para particulares, familias y *PyMEs*.\nComercializamos *Sancor Salud*, *Prevención Salud* y *Avalian*.\n\nSi sos PyME, podés armar tu grupo a partir de *5 personas*, que pueden ser empleados o familiares, con planes y tarifas especiales. También tenemos beneficios adicionales para grupos de más de 30 personas.\n\n¿Querés conocer las opciones? Simplemente respondé *SÍ* o *Info* para que podamos ayudarte a encontrar la mejor propuesta sin compromiso.'
                 mover_mouse_random(driver)
+                
+                mensaje = elaborar_mensaje(nombre, '')
                 envio = enviar_mensaje(driver, numero, mensaje)
                 # --- Lógica de actualización de CSV e inserción en Supabase ---
                 if envio:
@@ -282,7 +229,7 @@ def main():
                     print(f"✅ Mensaje enviado y se guardará el lead en Supabase")
                     
                     # Insertar en Supabase solo si el mensaje se envió
-                    nuevo_lead = insertar_lead(numero, negocio)
+                    nuevo_lead = insertar_lead(numero, nombre)
                     if nuevo_lead:
                         insertar_chat(numero, mensaje)
                 else:
